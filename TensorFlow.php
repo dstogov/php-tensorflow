@@ -375,55 +375,74 @@ final class Tensor extends API {
 final class Input extends API {
 	public $c;
 
-	function init(Operation $operation, int $index) {
+	public function init(Operation $operation, int $index) {
 		$this->c = self::$ffi->new("TF_Input");
 		$this->c->oper = $operation->c;
 		$this->c->index = $index;
 	}
 
-	function initFromC($cdata) {
+	public function initFromC($cdata) {
 		$this->c = $cdata;
 	}
 
-	function type() {
+	public function op() {
+		$op = new Operation();
+		$op->initFromC($this->c->oper);
+		return $op;
+	}
+
+	public function index() {
+		return $this->c->index;
+	}
+
+	public function type() {
 		return (int)self::$ffi->TF_OperationInputType($this->c);
 	}
 
-	function input() {
+	public function producer() {
 		$cdata = self::$ffi->TF_OperationInput($this->c);
 		$output = new Output();
 		$output->initFromC($cdata);
+		return $output;
 	}
 }
 
 final class Output extends API {
 	public $c;
 
-	function init(Operation $operation, int $index) {
+	public function init(Operation $operation, int $index) {
 		$this->c = self::$ffi->new("TF_Output");
 		$this->c->oper = $operation->c;
 		$this->c->index = $index;
 	}
 
-	function initFromC($cdata) {
+	public function initFromC($cdata) {
 		$this->c = $cdata;
 	}
 
-	function type() {
+	public function op() {
+		$op = new Operation();
+		$op->initFromC($this->c->oper);
+		return $op;
+	}
+
+	public function index() {
+		return $this->c->index;
+	}
+
+	public function type() {
 		return (int)self::$ffi->TF_OperationOutputType($this->c);
 	}
 
-	function shape() {
+	public function shape() {
 		throw new \Exception("Not Implemented"); //???
 	}
 }
 
 final class Operation extends API {
 	public $c;
-	public $graph;
 
 	public function init($graph, $type, $name, array $input = [], array $control = [], array $attr = []) {
-		$this->graph = $graph;
 		$status = new Status();
 		$desc = self::$ffi->TF_NewOperation($graph->c, $type, $name);
 
@@ -465,9 +484,8 @@ final class Operation extends API {
 		}
 	}
 
-	public function initFromC($cdata, $graph) {
+	public function initFromC($cdata) {
 		$this->c = $cdata;
-		$this->graph = $graph;
 	}
 
 	public function name() {
@@ -486,7 +504,7 @@ final class Operation extends API {
 		$input = self::$ffi->new("TF_Input");
 		$input->oper = $this->c;
 		$input->index = $n;
-		return (int)self::$ffi->TF_OperationInputType(FFI::addr($input));
+		return (int)self::$ffi->TF_OperationInputType($input);
 	}
 
 	public function numOutputs() {
@@ -497,7 +515,7 @@ final class Operation extends API {
 		$output = self::$ffi->new("TF_Output");
 		$output->oper = $this->c;
 		$output->index = $n;
-		return (int)self::$ffi->TF_OperationOutputType(FFI::addr($output));
+		return (int)self::$ffi->TF_OperationOutputType($output);
 	}
 
 	public function outputListSize($name) {
@@ -507,6 +525,12 @@ final class Operation extends API {
 			throw new \Exception($status->error());
 		}
 		return ret;
+	}
+
+	public function input($n) {
+		$input = new Input();
+		$input->init($this, $n);
+		return $input;
 	}
 
 	public function output($n) {
@@ -533,14 +557,38 @@ final class Graph extends API {
 			return null;
 		}
 		$op = new Operation();
-		$op->initFromC($cdata, $this);
+		$op->initFromC($cdata);
 		return $op;
+	}
+
+	public function operations() {
+		$pos = self::$ffi->new("size_t[1]");
+		$pos[0] = 0;
+		$ops = [];
+		while (1) {
+			$cdata = self::$ffi->TF_GraphNextOperation($this->c, $pos);
+			if (is_null($cdata)) {
+				break;
+			}
+			$op = new Operation();
+			$op->initFromC($cdata);
+			$ops[] = $op;
+		}
+		return $ops;
 	}
 
 	public function addOperation($type, $name, array $input = [], array $control = [], array $attr = []) {
 		$op = new Operation();
 		$op->init($this, $type, $name, $input, $control, $attr);
 		return $op;
+	}
+
+	public function write() {
+		throw new \Exception("Not Implemented"); //???
+	}
+
+	public static function import() {
+		throw new \Exception("Not Implemented"); //???
 	}
 }
 
@@ -727,6 +775,11 @@ final class TensorFlow extends API {
 		$graph = $this->_defaultGraph();
 		$status = $this->_defaultStatus();
 		return new Session($graph, null, $this->status);
+	}
+
+	public function operations() {
+		$graph = $this->_defaultGraph();
+		return $graph->operations();
 	}
 
 	protected function _defaultGraph() {

@@ -37,6 +37,13 @@ var_dump($ret->value());
 
 $ret = $sess->run(
 	$tf->add(
-		$tf->constant(42),
-		$tf->constant(5)));
+		$tf->constant([42, 17]),
+		$tf->constant([5, 25])));
+var_dump($ret->value());
+
+$ret = $sess->run(
+	$tf->add(
+		$tf->placeholder("x", \TF\DOUBLE),
+		$tf->placeholder("y", \TF\DOUBLE)),
+		["x" => $tf->tensor(42.0), "y" => $tf->tensor(5.0)]);
 var_dump($ret->value());

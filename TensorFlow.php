@@ -422,7 +422,7 @@ final class Operation extends API {
 	public $c;
 	public $graph;
 
-	public function __construct($graph, $type, $name, array $input = [], array $control = [], array $attr = []) {
+	public function init($graph, $type, $name, array $input = [], array $control = [], array $attr = []) {
 		$this->graph = $graph;
 		$status = new Status();
 		$desc = self::$ffi->TF_NewOperation($graph->c, $type, $name);
@@ -463,6 +463,11 @@ final class Operation extends API {
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
 		}
+	}
+
+	public function initFromC($cdata, $graph) {
+		$this->c = $cdata;
+		$this->graph = $graph;
 	}
 
 	public function name() {
@@ -522,8 +527,20 @@ final class Graph extends API {
 		self::$ffi->TF_DeleteGraph($this->c);
 	}
 
+	public function operation(string $name) {
+		$cdata = self::$ffi->TF_GraphOperationByName($this->c, $name);
+		if (is_null($cdata)) {
+			return null;
+		}
+		$op = new Operation();
+		$op->initFromC($cdata, $this);
+		return $op;
+	}
+
 	public function addOperation($type, $name, array $input = [], array $control = [], array $attr = []) {
-		return new Operation($this, $type, $name, $input, $control, $attr);
+		$op = new Operation();
+		$op->init($this, $type, $name, $input, $control, $attr);
+		return $op;
 	}
 }
 
@@ -572,12 +589,7 @@ final class Session extends API {
 		}
 	}
 
-	public function run($fetches = null, $feeds = null, $targes = null) {
-		$n_feeds = 0;
-		$c_feeds = null;
-		$c_feedTensors = null;
-		// TODO: process $feeds ???
-
+	public function run($fetches = null, array $feeds = null, $targes = null) {
 		$n_fetches = 0;
 		$c_fetches = null;
 		$c_fetchTensors = null;
@@ -600,6 +612,30 @@ final class Session extends API {
 				$t_fetchTensors = self::$ffi->type(self::$tensor_ptr, [$n_fetches]);
 				$c_fetchTensors = self::$ffi->new($t_fetchTensors);
 				$c_fetches[0] = $fetches->c;
+			}
+		}
+
+		$n_feeds = 0;
+		$c_feeds = null;
+		$c_feedTensors = null;
+		if (is_array($feeds)) {
+			$n_feeds = count($feeds);
+			if ($n_feeds > 0) {
+				$c_feeds = self::$ffi->new("TF_Output[$n_feeds]");
+				$c_feedTensors = self::$ffi->new("TF_Tensor*[$n_feeds]");
+				$i = 0;
+				foreach ($feeds as $key => $val) {
+					$op = $this->graph->operation($key);
+					if (!is_null($op)) {
+						$feed = new Output();
+						$feed->init($op, 0);
+						$c_feeds[$i] = $feed->c;
+						$c_feedTensors[$i] = $val->c;
+						$i++;
+					} else {
+						--$n_feeds;
+					}
+				}
 			}
 		}
 
@@ -646,6 +682,13 @@ final class TensorFlow extends API {
 		throw new \Exception("Not Implemented"); //???
 	}
 
+	public function tensor($value, $dataType = null, $shape = null) {
+		$status = $this->_defaultStatus();
+		$tensor = new Tensor();
+		$tensor->init($value, $dataType, $shape, $status);
+		return $tensor;
+	}
+
 	public function constant($value, $dataType = null, $shape = null, $name = null) {
 		if (is_null($name)) {
 			$name = self::_genName("Const");
@@ -658,6 +701,16 @@ final class TensorFlow extends API {
 			[	"dtype" => $tensor->dataType(),
 				"value" => $tensor,
 			]);
+		return $op->output(0);
+	}
+
+	public function placeholder($name, $dataType) {
+		if (is_null($name)) {
+			$name = self::_genName("Const");
+		}
+		$graph = $this->_defaultGraph();
+		$op = $graph->addOperation("Placeholder", $name, [], [],
+			["dtype" => $dataType]);
 		return $op->output(0);
 	}
 

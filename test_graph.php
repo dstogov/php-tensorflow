@@ -52,3 +52,10 @@ print_graph($tf->graph);
 
 $tf->graph->import($def, "import");
 print_graph($tf->graph);
+
+
+$x = $tf->tensor([ord('a'),ord('b'),ord('c'),ord('d')], \TF\INT8);
+var_dump($x->value());
+var_dump($x->bytes());
+$x->setBytes("xyz_");
+var_dump($x->value());

@@ -187,15 +187,47 @@ final class Tensor extends API {
 	}
 
 	public function isSerializable() {
-		throw new \Exception("Not Implemented"); //???
+		static $serializable = [
+			FLOAT      => 1,
+			DOUBLE     => 1,
+			INT32      => 1,
+			UINT8      => 1,
+			INT16      => 1,
+			INT8       => 1,
+			COMPLEX64  => 1,
+			COMPLEX    => 1,
+			INT64      => 1,
+			BOOL       => 1,
+			QINT8      => 1,
+			QUINT8     => 1,
+			QINT32     => 1,
+			BFLOAT16   => 1,
+			QINT16     => 1,
+			QUINT16    => 1,
+			UINT16     => 1,
+			COMPLEX128 => 1,
+			HALF       => 1,
+			UINT32     => 1,
+			UINT64     => 1,
+		];
+		return isset($serializable[$this->dataType]);
 	}
 
-	public function write() {
-		throw new \Exception("Not Implemented"); //???
+	public function bytes() {
+		if (!$this->isSerializable()) {
+			throw new \Exception("Unserializable tensor");
+		}
+		return FFI::string($this->plainData(), $this->dataSize);
 	}
 
-	public static function read() {
-		throw new \Exception("Not Implemented"); //???
+	public function setBytes(string $str) {
+		if (!$this->isSerializable()) {
+			throw new \Exception("Unserializable tensor");
+		}
+		if (strlen($str) != $this->dataSize) {
+			throw new \Exception("Size mismatch");
+		}
+		return FFI::memcpy($this->plainData(), $str, $this->dataSize);
 	}
 
 	public function plainData() {

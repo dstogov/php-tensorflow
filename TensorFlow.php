@@ -604,12 +604,36 @@ final class Graph extends API {
 		return $op;
 	}
 
-	public function write() {
-		throw new \Exception("Not Implemented"); //???
+	public function export() {
+		$status = new Status();
+		$buf = self::$ffi->TF_NewBuffer();
+		self::$ffi->TF_GraphToGraphDef($this->c, $buf, $status->c);
+		if ($status->code() != OK) {
+			self::$ffi->TF_DeleteBuffer($buf);
+			throw new \Exception($status->error());
+		}
+		$ret = FFI::string($buf[0]->data, $buf[0]->length);
+		self::$ffi->TF_DeleteBuffer($buf);
+		return $ret;
 	}
 
-	public static function import() {
-		throw new \Exception("Not Implemented"); //???
+	public function import(string $def, string $prefix = "") {
+		$opts = self::$ffi->TF_NewImportGraphDefOptions();
+		self::$ffi->TF_ImportGraphDefOptionsSetPrefix($opts, $prefix);
+		$len = strlen($def);
+		$b = FFI::new("char[$len]", 0);
+		FFI::memcpy($b, $def, $len);
+		$buf = self::$ffi->TF_NewBuffer();
+		$buf[0]->length = $len;
+		$buf[0]->data = $b;
+		$status = new Status();
+		self::$ffi->TF_GraphImportGraphDef($this->c, $buf, $opts, $status->c);
+		FFI::free($b);
+		self::$ffi->TF_DeleteBuffer($buf);
+		self::$ffi->TF_DeleteImportGraphDefOptions($opts);
+		if ($status->code() != OK) {
+			throw new \Exception($status->error());
+		}
 	}
 }
 
@@ -751,12 +775,13 @@ final class Session extends API {
 }
 
 final class TensorFlow extends API {
-	private $graph;
+	public $graph;
 	private $status;
 	static private $num = 0;
 
 	public function __construct() {
 		if (is_null(self::$ffi)) self::init_tf_ffi();
+		$this->_defaultGraph();
 	}
 
 	public function loadSavedModel() {
@@ -808,11 +833,6 @@ final class TensorFlow extends API {
 		$graph = $this->_defaultGraph();
 		$status = $this->_defaultStatus();
 		return new Session($graph, null, $this->status);
-	}
-
-	public function operations() {
-		$graph = $this->_defaultGraph();
-		return $graph->operations();
 	}
 
 	protected function _defaultGraph() {

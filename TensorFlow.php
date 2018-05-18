@@ -399,6 +399,10 @@ final class Input extends API {
 		return (int)self::$ffi->TF_OperationInputType($this->c);
 	}
 
+	public function shape() {
+		throw new \Exception("Not Implemented"); //???
+	}
+
 	public function producer() {
 		$cdata = self::$ffi->TF_OperationInput($this->c);
 		$output = new Output();
@@ -436,6 +440,28 @@ final class Output extends API {
 
 	public function shape() {
 		throw new \Exception("Not Implemented"); //???
+	}
+
+	public function numConsumers() {
+		return self::$ffi->TF_OperationOutputNumConsumers($this->c);
+	}
+
+	public function consumers() {
+		$num = self::$ffi->TF_OperationOutputNumConsumers($this->c);
+		if ($num) {
+			$buf = self::$ffi->new("TF_Input[$num]");
+			$num = self::$ffi->TF_OperationOutputConsumers($this->c, $buf, $num);
+			if ($num) {
+				$ret = [];
+				for ($i = 0; $i < $num; $i++) {
+					$in = new Input();
+					$in->initFromC(clone $buf[$i]);
+					$ret[] = $in;
+				}
+				return $ret;
+			}
+		}
+		return null;
 	}
 }
 
@@ -500,22 +526,17 @@ final class Operation extends API {
 		return (int)self::$ffi->TF_OperationNumInputs($this->c);
 	}
 
-	public function inputType($n) {
-		$input = self::$ffi->new("TF_Input");
-		$input->oper = $this->c;
-		$input->index = $n;
-		return (int)self::$ffi->TF_OperationInputType($input);
-	}
-
 	public function numOutputs() {
 		return (int)self::$ffi->TF_OperationNumOutputs($this->c);
 	}
 
-	public function outputType($n) {
-		$output = self::$ffi->new("TF_Output");
-		$output->oper = $this->c;
-		$output->index = $n;
-		return (int)self::$ffi->TF_OperationOutputType($output);
+	public function inputListSize($name) {
+		$status = new Status();
+		$ret = (int)self::$ffi->TF_OperationInputListLength($this->c, $name, $status->c);
+		if ($status->code() != OK) {
+			throw new \Exception($status->error());
+		}
+		return ret;
 	}
 
 	public function outputListSize($name) {
@@ -597,6 +618,18 @@ final class SessionOptions extends API {
 
 	public function __construct() {
 		$this->c = self::$ffi->TF_NewSessionOptions();
+	}
+
+	public function __destruct() {
+		self::$ffi->TF_DeleteSessionOptions($this->c);
+	}
+
+	public static function setTarget() {
+		throw new \Exception("Not Implemented"); //???
+	}
+
+	public static function setConfig() {
+		throw new \Exception("Not Implemented"); //???
 	}
 }
 

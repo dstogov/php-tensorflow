@@ -507,11 +507,16 @@ final class Operation extends API {
 		foreach ($input as $in) {
 			if ($in instanceof Output) {
 				self::$ffi->TF_AddInput($desc, $in->c);
-			} else if ($input instanceof OutputList) {
-				throw new \Exception("Not Implemented"); //???
-				//self::$ffi->TF_AddInputList($desc, ...);
-			} else {
-				throw new \Exception("Not Implemented"); //???
+			} else if (is_array($in)) {
+				$n_inputs = count($in);
+				$c_inputs = self::$ffi->new("TF_Output[$n_inputs]");
+				$i = 0;
+				foreach ($in as $el) {
+					$c_inputs[$i] = $el->c;
+					$i++;
+				}
+//var_dump($c_inputs, $n_inputs);
+				self::$ffi->TF_AddInputList($desc, $c_inputs, $n_inputs);
 			}
 		}
 
@@ -852,38 +857,33 @@ final class TensorFlow extends API {
 		return $tensor;
 	}
 
-	public function constant($value, $dataType = null, $shape = null, $name = null) {
+	public function op($type, array $input = [], array $control = [], array $attr = [], $name = null) {
 		if (is_null($name)) {
-			$name = self::_genName("Const");
+			$name = self::_genName($type);
 		}
 		$graph = $this->_defaultGraph();
+		$op = $graph->addOperation($type, $name, $input, $control, $attr);
+		return $op->output(0);
+	}
+
+	public function constant($value, $dataType = null, $shape = null, $name = null) {
 		$status = $this->_defaultStatus();
 		$tensor = new Tensor();
 		$tensor->init($value, $dataType, $shape, $status);
-		$op = $graph->addOperation("Const", $name, [], [],
-			[	"dtype" => $tensor->dataType(),
+		return $this->op("Const", [], [], [
+				"dtype" => $tensor->dataType(),
 				"value" => $tensor,
-			]);
-		return $op->output(0);
+			], $name);
 	}
 
 	public function placeholder($name, $dataType) {
-		if (is_null($name)) {
-			$name = self::_genName("Const");
-		}
-		$graph = $this->_defaultGraph();
-		$op = $graph->addOperation("Placeholder", $name, [], [],
-			["dtype" => $dataType]);
-		return $op->output(0);
+		return $this->op("Placeholder", [], [], [
+				"dtype" => $dataType
+			], $name);
 	}
 
 	public function add($x, $y, $name = null) {
-		if (is_null($name)) {
-			$name = self::_genName("Add");
-		}
-		$graph = $this->_defaultGraph();
-		$op = $graph->addOperation("Add", $name, [$x, $y]);
-		return $op->output(0);
+		return $this->op("Add", [$x, $y], [], [], $name);
 	}
 
 	public function session() {

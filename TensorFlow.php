@@ -561,6 +561,42 @@ final class Operation extends API {
 	}
 }
 
+final class Buffer extends API {
+	public $c;
+
+	public function __construct(string $str = null) {
+		if (is_null($str)) {
+			$this->c  = self::$ffi->TF_NewBuffer();
+		} else {
+			$this->c = self::$ffi->TF_NewBufferFromString($str, strlen($str));
+		}
+	}
+
+	public function __destruct() {
+		self::$ffi->TF_DeleteBuffer($this->c);
+	}
+
+	public function string() {
+		return FFI::string($this->c[0]->data, $this->c[0]->length);
+	}
+}
+
+final class ImportGraphDefOptions extends API {
+	public $c;
+
+	public function __construct() {
+		$this->c = self::$ffi->TF_NewImportGraphDefOptions();
+	}
+
+	public function __destruct() {
+		self::$ffi->TF_DeleteImportGraphDefOptions($this->c);
+	}
+
+	public function setPrefix(string $prefix) {
+		self::$ffi->TF_ImportGraphDefOptionsSetPrefix($this->c, $prefix);
+	}
+}
+
 final class Graph extends API {
 	public $c;
 
@@ -606,31 +642,20 @@ final class Graph extends API {
 
 	public function export() {
 		$status = new Status();
-		$buf = self::$ffi->TF_NewBuffer();
-		self::$ffi->TF_GraphToGraphDef($this->c, $buf, $status->c);
+		$buf = new Buffer();
+		self::$ffi->TF_GraphToGraphDef($this->c, $buf->c, $status->c);
 		if ($status->code() != OK) {
-			self::$ffi->TF_DeleteBuffer($buf);
 			throw new \Exception($status->error());
 		}
-		$ret = FFI::string($buf[0]->data, $buf[0]->length);
-		self::$ffi->TF_DeleteBuffer($buf);
-		return $ret;
+		return $buf->string();
 	}
 
 	public function import(string $def, string $prefix = "") {
-		$opts = self::$ffi->TF_NewImportGraphDefOptions();
-		self::$ffi->TF_ImportGraphDefOptionsSetPrefix($opts, $prefix);
-		$len = strlen($def);
-		$b = FFI::new("char[$len]", 0);
-		FFI::memcpy($b, $def, $len);
-		$buf = self::$ffi->TF_NewBuffer();
-		$buf[0]->length = $len;
-		$buf[0]->data = $b;
+		$opts = new ImportGraphDefOptions();
+		$opts->setPrefix($prefix);
+		$buf = new Buffer($def);
 		$status = new Status();
-		self::$ffi->TF_GraphImportGraphDef($this->c, $buf, $opts, $status->c);
-		FFI::free($b);
-		self::$ffi->TF_DeleteBuffer($buf);
-		self::$ffi->TF_DeleteImportGraphDefOptions($opts);
+		self::$ffi->TF_GraphImportGraphDef($this->c, $buf->c, $opts->c, $status->c);
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
 		}

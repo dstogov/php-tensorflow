@@ -515,7 +515,6 @@ final class Operation extends API {
 					$c_inputs[$i] = $el->c;
 					$i++;
 				}
-//var_dump($c_inputs, $n_inputs);
 				self::$ffi->TF_AddInputList($desc, $c_inputs, $n_inputs);
 			}
 		}

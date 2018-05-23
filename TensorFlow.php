@@ -800,6 +800,36 @@ final class Session extends API {
 		$this->close();
 	}
 
+	public function devices() {
+		$ret = [];
+		$list = self::$ffi->TF_SessionListDevices($this->c, $this->status->c);
+		if ($this->status->code() != OK) {
+			throw new \Exception($this->status->error());
+		}
+		$count = self::$ffi->TF_DeviceListCount($list);
+		for ($i = 0; $i < $count; $i++) {
+			$name = self::$ffi->TF_DeviceListName($list, $i, $this->status->c);
+			if ($this->status->code() != OK) {
+				throw new \Exception($this->status->error());
+			}
+			$type = self::$ffi->TF_DeviceListType($list, $i, $this->status->c);
+			if ($this->status->code() != OK) {
+				throw new \Exception($this->status->error());
+			}
+			$mem = self::$ffi->TF_DeviceListMemoryBytes($list, $i, $this->status->c);
+			if ($this->status->code() != OK) {
+				throw new \Exception($this->status->error());
+			}
+			$dev = new \stdClass(); //??
+			$dev->name = $name;
+			$dev->type = $type;
+			$dev->mem = $mem;
+			$ret[] = $dev;
+		}
+		self::$ffi->TF_DeleteDeviceList($list);
+		return $ret;
+	}
+
 	public function close() {
 		if (!is_null($this->c)) {
 			self::$ffi->TF_CloseSession($this->c, $this->status->c);

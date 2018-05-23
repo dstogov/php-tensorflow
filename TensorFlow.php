@@ -432,7 +432,8 @@ final class Input extends API {
 	}
 
 	public function shape() {
-		throw new \Exception("Not Implemented"); //???
+		$producer = $this->producer();
+		return $producer->shape();
 	}
 
 	public function producer() {

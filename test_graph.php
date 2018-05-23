@@ -32,6 +32,16 @@ function print_graph($g) {
 			}
 			echo "  out_$i: " . $out->type($i) . "$s\n";
 		}
+		$i = 0;
+		foreach($op->controlInputs() as $ctl) {
+			$i++;
+			echo "  ctl_in_$i: " . $ctl->name() . "\n";
+		}
+		$i = 0;
+		foreach($op->controlOutputs() as $ctl) {
+			$i++;
+			echo "  ctl_out_$i: " . $ctl->name() . "\n";
+		}
 	}
 	echo "\n";
 }

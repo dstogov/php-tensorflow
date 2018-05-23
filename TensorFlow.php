@@ -493,7 +493,7 @@ final class Output extends API {
 				return $ret;
 			}
 		}
-		return null;
+		return [];
 	}
 }
 
@@ -605,6 +605,51 @@ final class Operation extends API {
 		$output->init($this, $n);
 		return $output;
 	}
+
+	public function numControlInputs() {
+		return (int)self::$ffi->TF_OperationNumControlInputs($this->c);
+	}
+
+	public function controlInputs() {
+		$num = $this->numControlInputs();
+		if ($num) {
+			$buf = self::$ffi->new("TF_Operation*[$num]");
+			$num = self::$ffi->TF_OperationGetControlInputs($this->c, $buf, $num);
+			if ($num) {
+				$ret = [];
+				for ($i = 0; $i < $num; $i++) {
+					$in = new Operation();
+					$in->initFromC(clone $buf[$i]);
+					$ret[] = $in;
+				}
+				return $ret;
+			}
+		}
+		return [];
+	}
+
+	public function numControlOutputs() {
+		return (int)self::$ffi->TF_OperationNumControlOutputs($this->c);
+	}
+
+	public function controlOutputs() {
+		$num = $this->numControlOutputs();
+		if ($num) {
+			$buf = self::$ffi->new("TF_Operation*[$num]");
+			$num = self::$ffi->TF_OperationGetControlOutputs($this->c, $buf, $num);
+			if ($num) {
+				$ret = [];
+				for ($i = 0; $i < $num; $i++) {
+					$in = new Operation();
+					$in->initFromC(clone $buf[$i]);
+					$ret[] = $in;
+				}
+				return $ret;
+			}
+		}
+		return [];
+	}
+
 }
 
 final class Buffer extends API {

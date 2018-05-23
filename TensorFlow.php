@@ -695,6 +695,7 @@ final class ImportGraphDefOptions extends API {
 
 final class Graph extends API {
 	public $c;
+	private $nameNum = [];
 
 	public function __construct() {
 		$this->c = self::$ffi->TF_NewGraph();
@@ -731,6 +732,11 @@ final class Graph extends API {
 	}
 
 	public function addOperation($type, $name, array $input = [], array $control = [], array $attr = []) {
+		if (is_null($name)) {
+			$name = $this->_genName($type);
+		} else if (!is_null(self::$ffi->TF_GraphOperationByName($this->c, $name))) {
+			$name = $this->_genName($name);
+		}
 		$op = new Operation();
 		$op->init($this, $type, $name, $input, $control, $attr);
 		return $op;
@@ -755,6 +761,16 @@ final class Graph extends API {
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
 		}
+	}
+
+	private function _genName($name) {
+		if (isset($this->nameNum[$name])) {
+			$num = ++$this->nameNum[$name];
+		} else {
+			$this->nameNum[$name] = 1;
+			$num = 1;
+		}
+		return $name . "_" . $num;
 	}
 }
 
@@ -923,12 +939,12 @@ final class Session extends API {
 			return $t;
 		}
 	}
+
 }
 
 final class TensorFlow extends API {
 	public $graph;
 	private $status;
-	static private $num = 0;
 
 	public function __construct() {
 		if (is_null(self::$ffi)) self::init_tf_ffi();
@@ -947,9 +963,6 @@ final class TensorFlow extends API {
 	}
 
 	public function op($type, array $input = [], array $control = [], array $attr = [], $name = null) {
-		if (is_null($name)) {
-			$name = self::_genName($type);
-		}
 		$graph = $this->_defaultGraph();
 		$op = $graph->addOperation($type, $name, $input, $control, $attr);
 		return $op->output(0);
@@ -993,11 +1006,6 @@ final class TensorFlow extends API {
 			$this->status = new Status();
 		}
 		return $this->status;
-	}
-
-	static protected function _genName($name) {
-		$name .= "_" . ++self::$num;
-		return $name;
 	}
 }
 

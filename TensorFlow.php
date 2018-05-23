@@ -656,9 +656,13 @@ final class Operation extends API {
 final class Buffer extends API {
 	public $c;
 
-	public function __construct(string $str = null) {
+	public function __construct($str = null) {
 		if (is_null($str)) {
 			$this->c  = self::$ffi->TF_NewBuffer();
+		} else if (is_object($str) &&
+		           $str instanceof \FFI\CData &&
+		           self::$ffi->type($str) == self::$ffi->type("TF_Buffer*")) {
+			$this->c = $str;
 		} else {
 			$this->c = self::$ffi->TF_NewBufferFromString($str, strlen($str));
 		}

@@ -500,7 +500,7 @@ final class Output extends API {
 final class Operation extends API {
 	public $c;
 
-	public function init($graph, $type, $name, array $input = [], array $control = [], array $attr = []) {
+	public function init($graph, $type, $name, array $input = [], array $control = [], array $attr = [], string $device = null) {
 		$status = new Status();
 		$desc = self::$ffi->TF_NewOperation($graph->c, $type, $name);
 
@@ -540,6 +540,12 @@ final class Operation extends API {
 			}
 		}
 
+		if (is_string($device)) {
+			self::$ffi->TF_SetDevice($desc, $device);
+		} else if (!is_null($device)) {
+			throw new \Exception("Wrong Operation device");
+		}
+
 		$this->c = self::$ffi->TF_FinishOperation($desc, $status->c);
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
@@ -556,6 +562,10 @@ final class Operation extends API {
 
 	public function type() {
 		return (string)self::$ffi->TF_OperationOpType($this->c);
+	}
+
+	public function device() {
+		return (string)self::$ffi->TF_OperationDevice($this->c);
 	}
 
 	public function numInputs() {

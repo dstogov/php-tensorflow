@@ -3,7 +3,7 @@ require_once("TensorFlow.php");
 
 function print_graph($g) {
 	foreach ($g->operations() as $op) {
-		echo $op->name() . ": " . $op->type() . "\n";
+		echo $op->name() . ": " . $op->type() . ", " . $op->device() . "\n";
 		$count = $op->numInputs();
 		for ($i = 0; $i < $count; $i++) {
 			$in = $op->input($i);

@@ -53,10 +53,12 @@ const DATA_LOSS           = 15;
 class API {
 	static protected $ffi;
 	static protected $tensor_ptr;
+	static protected $operation_ptr;
 
 	static protected function init_tf_ffi() {
 		self::$ffi = FFI::load(__DIR__ . "/tf_api.h");
 		self::$tensor_ptr = self::$ffi->type("TF_Tensor*");
+		self::$operation_ptr = self::$ffi->type("TF_Operation*");
 	}
 
 	public function version() {
@@ -614,7 +616,8 @@ final class Operation extends API {
 	public function controlInputs() {
 		$num = $this->numControlInputs();
 		if ($num) {
-			$buf = self::$ffi->new("TF_Operation*[$num]");
+			$type = FFI::type(self::$operation_ptr, [$num]);
+			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlInputs($this->c, $buf, $num);
 			if ($num) {
 				$ret = [];
@@ -636,7 +639,8 @@ final class Operation extends API {
 	public function controlOutputs() {
 		$num = $this->numControlOutputs();
 		if ($num) {
-			$buf = self::$ffi->new("TF_Operation*[$num]");
+			$type = FFI::type(self::$operation_ptr, [$num]);
+			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlOutputs($this->c, $buf, $num);
 			if ($num) {
 				$ret = [];
@@ -800,7 +804,7 @@ final class Session extends API {
 	private $options;
 	private $status;
 
-	public function __construct(Graph $graph, SessionOptions $options = null, Status $status = null) {
+	public function __construct(Graph $graph, SessionOptions $options = null, Status $status = null, $c_session = null) {
 		$this->graph = $graph;
 	    if (is_null($options)) {
     		$options = new SessionOptions();
@@ -810,9 +814,13 @@ final class Session extends API {
     		$status = new Status();
 		}
 		$this->status = $status;
-		$this->c = self::$ffi->TF_NewSession($this->graph->c, $this->options->c, $this->status->c);
-		if ($this->status->code() != OK) {
-			throw new \Exception($this->status->error());
+		if (!is_null($c_session)) {
+			$this->c = $c_session;
+		} else {
+			$this->c = self::$ffi->TF_NewSession($this->graph->c, $this->options->c, $this->status->c);
+			if ($this->status->code() != OK) {
+				throw new \Exception($this->status->error());
+			}
 		}
 	}
 
@@ -951,8 +959,39 @@ final class TensorFlow extends API {
 		$this->_defaultGraph();
 	}
 
-	public function loadSavedModel() {
-		throw new \Exception("Not Implemented"); //???
+	public function loadSavedModel(string $dir, array $tags = ["serve"], SessionOptions $options = null) {
+		if (is_null($options)) {
+			$options = new SessionOptions();
+		}
+		$n_tags = count($tags);
+		$c_tags = self::$ffi->new("char*[$n_tags]");
+		$i = 0;
+		foreach ($tags as $tag) {
+			$len = strlen($tag);
+			$c_len = $len + 1;
+			$str = self::$ffi->new("char[$c_len]", 0);
+			FFI::memcpy($str, $tag, $len);
+			$c_tags[$i] = $str;
+			$i++;
+		}
+		$graph = $this->_defaultGraph();
+		$status = $this->_defaultStatus();
+		$c_session = self::$ffi->TF_LoadSessionFromSavedModel(
+			$options->c,
+			null, // const TF_Buffer* run_options,
+			$dir,
+			$c_tags,
+			$n_tags,
+			$graph->c,
+			null, // TF_Buffer* meta_graph_def,
+		    $status->c);
+		for ($i = 0; $i < $n_tags; $i++) {
+			FFI::free($c_tags[$i]);
+		}
+		if ($status->code() != OK) {
+			throw new \Exception($status->error());
+		}
+		return new Session($graph, $options, $status, $c_session);
 	}
 
 	public function tensor($value, $dataType = null, $shape = null) {

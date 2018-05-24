@@ -22,7 +22,7 @@ function print_graph($g) {
 				$first = true;
 				foreach ($inputs as $in) {
 					if (!$first) {
-						$s = ", ";
+						$s .= ", ";
 					} else {
 						$first = false;
 					}

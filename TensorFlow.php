@@ -105,12 +105,15 @@ final class Tensor extends API {
 		}
 		$this->status = $status;
 
-		if ($dataType == null) {
-			$dataType = self::_guessType($value);
+		if (!is_null($value)) {
+			if ($dataType == null) {
+				$dataType = self::_guessType($value);
+			}
+			if ($shape == null) {
+				$shape = self::_guessShape($value);
+			}
 		}
-		if ($shape == null) {
-			$shape = self::_guessShape($value);
-		}
+
 		$ndims = 0;
 		$shapePtr = null;
 		$nflattened = 1;
@@ -139,11 +142,13 @@ final class Tensor extends API {
 		$this->nflattened = $nflattened;
 		$this->dataSize = $nbytes;
 
-		$data = $this->data();
-		if ($dataType == STRING) {
-			$this->_stringEncode($value, $data);
-		} else {
-			$this->_encode($value, $data);
+		if (!is_null($value)) {
+			$data = $this->data();
+			if ($dataType == STRING) {
+				$this->_stringEncode($value, $data);
+			} else {
+				$this->_encode($value, $data);
+			}
 		}
 	}
 
@@ -1001,10 +1006,10 @@ final class TensorFlow extends API {
 		return $tensor;
 	}
 
-	public function op($type, array $input = [], array $control = [], array $attr = [], $name = null) {
+	public function op($type, array $input = [], array $control = [], array $attr = [], $name = null, $n = 0) {
 		$graph = $this->_defaultGraph();
 		$op = $graph->addOperation($type, $name, $input, $control, $attr);
-		return $op->output(0);
+		return $op->output($n);
 	}
 
 	public function constant($value, $dataType = null, $shape = null, $name = null) {

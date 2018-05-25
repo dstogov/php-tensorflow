@@ -20,9 +20,10 @@ function test_stringJoin($val1, $val2) {
 	$tf = new TensorFlow();
 	$sess = $tf->session();
 
-	$ret = $sess->run(
-		$tf->op("StringJoin",
-			[[$tf->constant($val1), $tf->constant($val2)]]));
+	$join = $tf->op("StringJoin",
+				[[$tf->constant($val1), $tf->constant($val2)]]);
+	var_dump($join->op()->inputListSize("inputs"));
+	$ret = $sess->run($join);
 	var_dump($ret->value());
 }
 

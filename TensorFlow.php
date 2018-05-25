@@ -674,7 +674,7 @@ final class Operation extends API {
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
 		}
-		return ret;
+		return $ret;
 	}
 
 	public function outputListSize($name) {
@@ -683,7 +683,7 @@ final class Operation extends API {
 		if ($status->code() != OK) {
 			throw new \Exception($status->error());
 		}
-		return ret;
+		return $ret;
 	}
 
 	public function input($n) {

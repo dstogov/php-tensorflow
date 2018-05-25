@@ -584,6 +584,30 @@ final class Output extends API {
 	}
 }
 
+final class Type {
+	public $type;
+
+	function __construct(int $type) {
+		$this->type = $type;
+	}
+}
+
+final class Shape {
+	public $shape;
+
+	function __construct(array $shape = null) {
+		$this->shape = $shape;
+	}
+}
+
+final class FuncName {
+	public $func_name;
+
+	function __construct(string $func_name) {
+		$this->shape_proto = $func_name;
+	}
+}
+
 final class Operation extends API {
 	public $c;
 	private $graph;
@@ -615,20 +639,134 @@ final class Operation extends API {
 			self::$ffi->TF_AddControlInput($desc, $ctl->c);
 		}
 
-		// TODO: proper $attr support ???
 		foreach ($attr as $key => $val) {
-			switch ($key) {
-				case "value":
-					self::$ffi->TF_SetAttrTensor($desc, $key, $val->c, $status->c);
+			if (is_string($val)) {
+				self::$ffi->TF_SetAttrString($desc, $key, $val, strlen($val));
+			} else if (is_int($val)) {
+				self::$ffi->TF_SetAttrInt($desc, $key, $val);
+			} else if (is_float($val)) {
+				self::$ffi->TF_SetAttrFloat($desc, $key, $val);
+			} else if (is_bool($val)) {
+				self::$ffi->TF_SetAttrBool($desc, $key, $val);
+			} else if (is_object($val) && $val instanceof Type) {
+				self::$ffi->TF_SetAttrType($desc, $key, $val->type);
+			} else if (is_object($val) && $val instanceof FuncName) {
+				self::$ffi->TF_SetAttrFuncName($desc, $key, $val->func_name, strlen($val->func_name));
+			} else if (is_object($val) && $val instanceof Shape) {
+				$shape = $val->shape;
+				$num_dims = count($shape);
+				$dims = self::$ffi->new("int64_t[$num_dims]");
+				$j = 0;
+				foreach ($shape as $dim) {
+					$dims[$j++] = (int)$dim;
+				}
+				self::$ffi->TF_SetAttrShape($desc, $key, $dims, $num_dims);
+			} else if (is_object($val) && $val instanceof Tensor) {
+				self::$ffi->TF_SetAttrTensor($desc, $key, $val->c, $status->c);
+				if ($status->code() != OK) {
+					throw new \Exception($status->error());
+				}
+			} else if (is_array($val) && count($val) > 0) {
+				$num = count($val);
+				foreach ($val as $el) break;
+				if (is_string($el)) {
+					$buf = self::$ffi->new("char*[$num]");
+					$len = self::$ffi->new("size_t[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if (is_string($el)) {
+							$buf[$i] = $el; //???
+							$len[$i] = strlen($el);
+							$i++;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrStringList($desc, $key, $buf, $len, $num);
+				} else if (is_int($el)) {
+					$buf = self::$ffi->new("int64_t[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if (is_int($el)) {
+							$buf[$i++] = $el;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrIntList($desc, $key, $buf, $num);
+				} else if (is_float($el)) {
+					$buf = self::$ffi->new("float[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if (is_float($el)) {
+							$buf[$i++] = $el;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrFloatList($desc, $key, $buf, $num);
+				} else if (is_bool($el)) {
+					$buf = self::$ffi->new("unsigned char[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if (is_bool($el)) {
+							$buf[$i++] = $el;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrBoolList($desc, $key, $buf, $num);
+				} else if (is_object($el) && $el instanceof Type) {
+					$buf = self::$ffi->new("TF_DataType[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if ($el instanceof Type) {
+							$buf[$i++] = $el->type;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrTypeList($desc, $key, $buf, $num);
+				} else if (is_object($el) && $el instanceof Shape) {
+					$buf = self::$ffi->new("int64_t*[$num]");
+					$len = self::$ffi->new("int[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if ($el instanceof Shape) {
+							$shape = $el->shape;
+							$num_dims = count($shape);
+							$dims = self::$ffi->new("int64_t[$num_dims]");
+							$j = 0;
+							foreach ($shape as $dim) {
+								$dims[$j++] = (int)$dim;
+							}
+							$buf[$i] = $dims;
+							$len[$i] = $num_dims;
+							$i++;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrShapeList($desc, $key, $buf, $len, $num);
+				} else if (is_object($el) && $el instanceof Tensor) {
+					$buf = self::$ffi->new("TF_Tensor*[$num]");
+					$i = 0;
+					foreach ($val as $el) {
+						if ($el instanceof Tensor) {
+							$buf[$i++] = $el->type;
+						} else {
+							throw new \Exception("Wrong attr type");
+						}
+					}
+					self::$ffi->TF_SetAttrTensorList($desc, $key, $buf, $num, $status->c);
 					if ($status->code() != OK) {
 						throw new \Exception($status->error());
 					}
-					break;
-				case "dtype":
-					self::$ffi->TF_SetAttrType($desc, $key, $val);
-					break;
-				default:
-					throw new \Exception("Unknown Operation attr");
+				} else {
+					throw new \Exception("Unknown Operation attr type");
+				}
+			} else {
+				throw new \Exception("Unknown Operation attr type");
 			}
 		}
 
@@ -1101,14 +1239,14 @@ final class TensorFlow extends API {
 		$tensor = new Tensor();
 		$tensor->init($value, $dataType, $shape, $status);
 		return $this->op("Const", [], [], [
-				"dtype" => $tensor->type(),
+				"dtype" => new Type($tensor->type()),
 				"value" => $tensor,
 			], $name);
 	}
 
 	public function placeholder($name, $dataType) {
 		return $this->op("Placeholder", [], [], [
-				"dtype" => $dataType
+				"dtype" => new Type($dataType)
 			], $name);
 	}
 

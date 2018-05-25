@@ -32,6 +32,33 @@ const VARIANT    = 21;
 const UINT32     = 22;
 const UINT64     = 23;
 
+const TYPE_NAME  = [
+	FLOAT      => "FLOAT",
+	DOUBLE     => "DOUBLE",
+	INT32      => "INT32",
+	UINT8      => "UINT8",
+	INT16      => "INT16",
+	INT8       => "INT8",
+	STRING     => "STRING",
+	COMPLEX64  => "COMPLEX64",
+	COMPLEX    => "COMPLEX",
+	INT64      => "INT64",
+	BOOL       => "BOOL",
+	QINT8      => "QINT8",
+	QUINT8     => "QUINT8",
+	QINT32     => "QINT32",
+	BFLOAT16   => "BFLOAT16",
+	QINT16     => "QINT16",
+	QUINT16    => "QUINT16",
+	UINT16     => "UINT16",
+	COMPLEX128 => "COMPLEX128",
+	HALF       => "HALF",
+	RESOURCE   => "RESOURCE",
+	VARIANT    => "VARIANT",
+	UINT32     => "UINT32",
+	UINT64     => "UINT64",
+];
+
 const OK                  = 0;
 const CANCELLED           = 1;
 const UNKNOWN             = 2;
@@ -63,6 +90,18 @@ class API {
 
 	public function version() {
 		return (string)self::$ffi->TF_Version();
+	}
+
+	static protected function _typeName($type, $shape) {
+		if ($type < 100) {
+			$name = TYPE_NAME[$type];
+		} else {
+			$name = '&' . TYPE_NAME[$type - 100];
+		}
+		if (is_array($shape) && count($shape) > 0) {
+			$name .= '[' . implode(',', $shape) . ']';
+		}
+		return $name;
 	}
 }
 
@@ -176,12 +215,16 @@ final class Tensor extends API {
 		}
 	}
 
-	public function dataType() {
+	public function type() {
 		return $this->dataType;
 	}
 
 	public function shape() {
 		return $this->shape;
+	}
+
+	public function typeName() {
+		return self::_typeName($this->dataType, $this->shape);
 	}
 
 	public function value() {
@@ -274,7 +317,7 @@ final class Tensor extends API {
 				"struct {uint64_t offsets[$n]; char data[$m];}",
 				$this->plainData(), true);
 		} else {
-			$cast = @$map[$this->dataType()];
+			$cast = @$map[$this->dataType];
 			if (isset($cast)) {
 				$cast .= "[$n]";
 				return self::$ffi->cast($cast, $this->plainData(), true);
@@ -413,6 +456,11 @@ final class Tensor extends API {
 
 final class Input extends API {
 	public $c;
+	private $graph;
+
+	public function __construct(Graph $graph) {
+		$this->graph = $graph;
+	}
 
 	public function init(Operation $operation, int $index) {
 		$this->c = self::$ffi->new("TF_Input");
@@ -425,7 +473,7 @@ final class Input extends API {
 	}
 
 	public function op() {
-		$op = new Operation();
+		$op = new Operation($this->graph);
 		$op->initFromC($this->c->oper);
 		return $op;
 	}
@@ -443,9 +491,13 @@ final class Input extends API {
 		return $producer->shape();
 	}
 
+	public function typeName() {
+		return self::_typeName($this->type(), $this->shape());
+	}
+
 	public function producer() {
 		$cdata = self::$ffi->TF_OperationInput($this->c);
-		$output = new Output();
+		$output = new Output($this->graph);
 		$output->initFromC($cdata);
 		return $output;
 	}
@@ -453,6 +505,11 @@ final class Input extends API {
 
 final class Output extends API {
 	public $c;
+	private $graph;
+
+	public function __construct(Graph $graph) {
+		$this->graph = $graph;
+	}
 
 	public function init(Operation $operation, int $index) {
 		$this->c = self::$ffi->new("TF_Output");
@@ -465,7 +522,7 @@ final class Output extends API {
 	}
 
 	public function op() {
-		$op = new Operation();
+		$op = new Operation($this->graph);
 		$op->initFromC($this->c->oper);
 		return $op;
 	}
@@ -479,7 +536,29 @@ final class Output extends API {
 	}
 
 	public function shape() {
-		throw new \Exception("Not Implemented"); //???
+		$status = new Status;
+		$ndims = self::$ffi->TF_GraphGetTensorNumDims($this->graph->c, $this->c, $status->c);
+		if ($status->code() != OK) {
+			throw new \Exception($status->error());
+		}
+		$ret = null;
+		if ($ndims >= 0) {
+			$buf = self::$ffi->new("int64_t[$ndims]");
+			self::$ffi->TF_GraphGetTensorShape($this->graph->c, $this->c,
+				$buf, $ndims, $status->c);
+			if ($status->code() != OK) {
+				throw new \Exception($status->error());
+			}
+			$ret = [];
+			for ($i = 0; $i < $ndims; $i++) {
+				$ret[$i] = $buf[$i];
+			}
+		}
+		return $ret;
+	}
+
+	public function typeName() {
+		return self::_typeName($this->type(), $this->shape());
 	}
 
 	public function numConsumers() {
@@ -494,7 +573,7 @@ final class Output extends API {
 			if ($num) {
 				$ret = [];
 				for ($i = 0; $i < $num; $i++) {
-					$in = new Input();
+					$in = new Input($this->graph);
 					$in->initFromC(clone $buf[$i]);
 					$ret[] = $in;
 				}
@@ -507,6 +586,11 @@ final class Output extends API {
 
 final class Operation extends API {
 	public $c;
+	private $graph;
+
+	public function __construct(Graph $graph) {
+		$this->graph = $graph;
+	}
 
 	public function init($graph, $type, $name, array $input = [], array $control = [], array $attr = [], string $device = null) {
 		$status = new Status();
@@ -603,13 +687,13 @@ final class Operation extends API {
 	}
 
 	public function input($n) {
-		$input = new Input();
+		$input = new Input($this->graph);
 		$input->init($this, $n);
 		return $input;
 	}
 
 	public function output($n) {
-		$output = new Output();
+		$output = new Output($this->graph);
 		$output->init($this, $n);
 		return $output;
 	}
@@ -627,7 +711,7 @@ final class Operation extends API {
 			if ($num) {
 				$ret = [];
 				for ($i = 0; $i < $num; $i++) {
-					$in = new Operation();
+					$in = new Operation($this->graph);
 					$in->initFromC(clone $buf[$i]);
 					$ret[] = $in;
 				}
@@ -650,7 +734,7 @@ final class Operation extends API {
 			if ($num) {
 				$ret = [];
 				for ($i = 0; $i < $num; $i++) {
-					$in = new Operation();
+					$in = new Operation($this->graph);
 					$in->initFromC(clone $buf[$i]);
 					$ret[] = $in;
 				}
@@ -719,7 +803,7 @@ final class Graph extends API {
 		if (is_null($cdata)) {
 			return null;
 		}
-		$op = new Operation();
+		$op = new Operation($this);
 		$op->initFromC($cdata);
 		return $op;
 	}
@@ -733,7 +817,7 @@ final class Graph extends API {
 			if (is_null($cdata)) {
 				break;
 			}
-			$op = new Operation();
+			$op = new Operation($this);
 			$op->initFromC($cdata);
 			$ops[] = $op;
 		}
@@ -746,7 +830,7 @@ final class Graph extends API {
 		} else if (!is_null(self::$ffi->TF_GraphOperationByName($this->c, $name))) {
 			$name = $this->_genName($name);
 		}
-		$op = new Operation();
+		$op = new Operation($this);
 		$op->init($this, $type, $name, $input, $control, $attr);
 		return $op;
 	}
@@ -912,7 +996,7 @@ final class Session extends API {
 				foreach ($feeds as $key => $val) {
 					$op = $this->graph->operation($key);
 					if (!is_null($op)) {
-						$feed = new Output();
+						$feed = new Output($this->graph);
 						$feed->init($op, 0);
 						$c_feeds[$i] = $feed->c;
 						$c_feedTensors[$i] = $val->c;
@@ -1017,7 +1101,7 @@ final class TensorFlow extends API {
 		$tensor = new Tensor();
 		$tensor->init($value, $dataType, $shape, $status);
 		return $this->op("Const", [], [], [
-				"dtype" => $tensor->dataType(),
+				"dtype" => $tensor->type(),
 				"value" => $tensor,
 			], $name);
 	}

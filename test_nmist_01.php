@@ -1,11 +1,12 @@
 <?php
-/* 
+/*
  * Handwritten digits recognation using pre-traind saved model
  *
  * See: http://yann.lecun.com/exdb/mnist/
  *
  */
 require_once("TensorFlow.php");
+require_once("PrintGraph.php");
 
 const MODEL       = './models/mnist_500_500_softmax_linear';
 const TEST_IMAGES = './datasets/mnist/t10k-images-idx3-ubyte.gz';
@@ -22,6 +23,7 @@ function main() {
 		$tf->op('Reshape', [
 			$tf->op('TopKV2', [$out, $tf->constant(1, \TF\INT32)], [], [], null, 1),
 			$tf->constant([-1])]);
+	//print_graph($tf->graph);
 	/* Recognation */
 	$ret = $sess->run($out_label, ['Placeholder' => get_images($tf)]);
 	/* Verification */
@@ -51,7 +53,7 @@ function get_images($tf) {
 			$data[$i * $pixels + $j] = ord($s[$n++]) / 255.0;
 		}
 	}
-	return $ret;		
+	return $ret;
 }
 
 function read32($f) {

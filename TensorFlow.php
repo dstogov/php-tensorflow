@@ -315,12 +315,12 @@ final class Tensor extends API {
 			$m = $this->dataSize - $this->nflattened * 8;
 			return self::$ffi->cast(
 				"struct {uint64_t offsets[$n]; char data[$m];}",
-				$this->plainData(), true);
+				$this->plainData());
 		} else {
 			$cast = @$map[$this->dataType];
 			if (isset($cast)) {
 				$cast .= "[$n]";
-				return self::$ffi->cast($cast, $this->plainData(), true);
+				return self::$ffi->cast($cast, $this->plainData());
 			} else {
 				throw new \Exception("Not Implemented"); //???
 			}
@@ -843,7 +843,7 @@ final class Operation extends API {
 	public function controlInputs() {
 		$num = $this->numControlInputs();
 		if ($num) {
-			$type = FFI::type(self::$operation_ptr, [$num]);
+			$type = FFI::array(self::$operation_ptr, [$num]);
 			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlInputs($this->c, $buf, $num);
 			if ($num) {
@@ -866,7 +866,7 @@ final class Operation extends API {
 	public function controlOutputs() {
 		$num = $this->numControlOutputs();
 		if ($num) {
-			$type = FFI::type(self::$operation_ptr, [$num]);
+			$type = FFI::array(self::$operation_ptr, [$num]);
 			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlOutputs($this->c, $buf, $num);
 			if ($num) {
@@ -1105,7 +1105,7 @@ final class Session extends API {
 				$n_fetches = count($fetches);
 				if ($n_fetches > 0) {
 					$c_fetches = self::$ffi->new("TF_Output[$n_fetches]");
-					$t_fetchTensors = self::$ffi->type(self::$tensor_ptr, [$n_fetches]);
+					$t_fetchTensors = FFI::array(self::$tensor_ptr, [$n_fetches]);
 					$c_fetchTensors = self::$ffi->new($t_fetchTensors);
 				}
 				$i = 0;
@@ -1116,7 +1116,7 @@ final class Session extends API {
 			} else {
 				$n_fetches = 1;
 				$c_fetches = self::$ffi->new("TF_Output[1]");
-				$t_fetchTensors = self::$ffi->type(self::$tensor_ptr, [$n_fetches]);
+				$t_fetchTensors = FFI::array(self::$tensor_ptr, [$n_fetches]);
 				$c_fetchTensors = self::$ffi->new($t_fetchTensors);
 				$c_fetches[0] = $fetches->c;
 			}
@@ -1196,7 +1196,7 @@ final class TensorFlow extends API {
 		foreach ($tags as $tag) {
 			$len = strlen($tag);
 			$c_len = $len + 1;
-			$str = self::$ffi->new("char[$c_len]", 0);
+			$str = FFI::own(self::$ffi->new("char[$c_len]"), false);
 			FFI::memcpy($str, $tag, $len);
 			$c_tags[$i] = $str;
 			$i++;

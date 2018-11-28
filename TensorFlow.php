@@ -368,18 +368,18 @@ final class Tensor extends API {
 
 		$offset = $data->offsets[$dim_offset++];
 
-		$dst = self::$ffi->new("char*");
-		$dst_len = self::$ffi->new("size_t");
+		$dst = self::$ffi->new("char*[1]");
+		$dst_len = self::$ffi->new("size_t[1]");
 		self::$ffi->TF_StringDecode(
 				FFI::offset($data->data, $offset),
 				$this->dataSize - $offset,
-				FFI::addr($dst),
-				FFI::addr($dst_len),
+				$dst,
+				$dst_len,
 				$this->status->c);
 		if ($this->status->code() != OK) {
 			throw new \Exception($this->status->error());
 		}
-		return FFI::string($dst, (int)$dst_len);
+		return FFI::string($dst[0], $dst_len[0]);
 	}
 
 	private function _encode($value, $data, &$dim_offset = 0, $dim = 0, $n = 0) {

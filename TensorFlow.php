@@ -347,7 +347,7 @@ final class Tensor extends API {
 		$offset += self::$ffi->TF_StringEncode(
 			$str,
 			strlen($str),
-			FFI::offset($data->data, $offset),
+			$data->data + $offset,
 			self::$ffi->TF_StringEncodedSize(strlen($str)),
 			$this->status->c);
 		if ($this->status->code() != OK) {
@@ -371,7 +371,7 @@ final class Tensor extends API {
 		$dst = self::$ffi->new("char*[1]");
 		$dst_len = self::$ffi->new("size_t[1]");
 		self::$ffi->TF_StringDecode(
-				FFI::offset($data->data, $offset),
+				$data->data + $offset,
 				$this->dataSize - $offset,
 				$dst,
 				$dst_len,

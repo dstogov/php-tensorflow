@@ -1196,7 +1196,7 @@ final class TensorFlow extends API {
 		foreach ($tags as $tag) {
 			$len = strlen($tag);
 			$c_len = $len + 1;
-			$str = FFI::own(self::$ffi->new("char[$c_len]"), false);
+			$str = self::$ffi->new("char[$c_len]", false);
 			FFI::memcpy($str, $tag, $len);
 			$c_tags[$i] = $str;
 			$i++;

@@ -843,7 +843,7 @@ final class Operation extends API {
 	public function controlInputs() {
 		$num = $this->numControlInputs();
 		if ($num) {
-			$type = FFI::array(self::$operation_ptr, [$num]);
+			$type = FFI::array_type(self::$operation_ptr, [$num]);
 			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlInputs($this->c, $buf, $num);
 			if ($num) {
@@ -866,7 +866,7 @@ final class Operation extends API {
 	public function controlOutputs() {
 		$num = $this->numControlOutputs();
 		if ($num) {
-			$type = FFI::array(self::$operation_ptr, [$num]);
+			$type = FFI::array_type(self::$operation_ptr, [$num]);
 			$buf = self::$ffi->new($type);
 			$num = self::$ffi->TF_OperationGetControlOutputs($this->c, $buf, $num);
 			if ($num) {
@@ -1105,7 +1105,7 @@ final class Session extends API {
 				$n_fetches = count($fetches);
 				if ($n_fetches > 0) {
 					$c_fetches = self::$ffi->new("TF_Output[$n_fetches]");
-					$t_fetchTensors = FFI::array(self::$tensor_ptr, [$n_fetches]);
+					$t_fetchTensors = FFI::array_type(self::$tensor_ptr, [$n_fetches]);
 					$c_fetchTensors = self::$ffi->new($t_fetchTensors);
 				}
 				$i = 0;
@@ -1116,7 +1116,7 @@ final class Session extends API {
 			} else {
 				$n_fetches = 1;
 				$c_fetches = self::$ffi->new("TF_Output[1]");
-				$t_fetchTensors = FFI::array(self::$tensor_ptr, [$n_fetches]);
+				$t_fetchTensors = FFI::array_type(self::$tensor_ptr, [$n_fetches]);
 				$c_fetchTensors = self::$ffi->new($t_fetchTensors);
 				$c_fetches[0] = $fetches->c;
 			}
